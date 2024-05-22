@@ -37,6 +37,7 @@ import Constants from '../../streaming/constants/Constants';
 import {HTTPRequest} from '../vo/metrics/HTTPRequest';
 import DashManifestModel from '../../dash/models/DashManifestModel';
 import Utils from '../../core/Utils';
+import { datadogRum } from '@datadog/browser-rum';
 
 const CMCD_REQUEST_FIELD_NAME = 'CMCD';
 const CMCD_VERSION = 1;
@@ -75,7 +76,7 @@ function CmcdModel() {
 
     let _startTime = Date.now();
     let _firstLoad = true;
-    
+
     let context = this.context;
     let eventBus = EventBus(context).getInstance();
     let settings = Settings(context).getInstance();
@@ -95,16 +96,18 @@ function CmcdModel() {
 
         // Extra events just for RUM
         eventBus.on(MediaPlayerEvents.PLAYBACK_STARTED, () => {
-            console.log("TODO-LOG-RUM: Playback started!");
+            datadogRum.addAction('playbackStarted', {});
         });
         eventBus.on(MediaPlayerEvents.PLAYBACK_PAUSED, () => {
-            console.log("TODO-LOG-RUM: Playback paused!");
+            datadogRum.addAction('playbackPaused', {});
         });
         eventBus.on(MediaPlayerEvents.PLAYBACK_ENDED, () => {
-            console.log("TODO-LOG-RUM: Playback ended!");
+            datadogRum.addAction('playbackEnded', {});
         });
         eventBus.on(MediaPlayerEvents.PLAYBACK_ERROR, (e) => {
-            console.log("TODO-LOG-RUM: Playback error: " + e.error);
+            datadogRum.addAction('playbackError', {
+                'error': e.error,
+            });
         });
     }
 
@@ -364,17 +367,14 @@ function CmcdModel() {
         // This function is currently only called when the HTTP loader needs to
         // send another request to the CDN for a segment. We can beacon RUM events
         // from here knowing that it is tied to this event.
-        if (data.mtp) {
-            console.log("TODO-LOG-RUM: Throughput: " + data.mtp + "kbps");
-        }
-        if (data.br) {
-            console.log("TODO-LOG-RUM: Bitrate: " + data.br + "kbps");
-        }
-        if (data.bl) {
-            console.log("TODO-LOG-RUM: Buffer Level: " + data.bl);
-        }
+        console.log('adding dd stuff');
+        datadogRum.addAction('qualitySnapshot', {
+            'throughput': data.mtp,
+            'bitrate': data.br,
+            'bufferLength': data.bl,
+        });
         if(data.bs) {
-            console.log("TODO-LOG-RUM: Buffer Starved: " + data.bs);
+            datadogRum.addAction('bufferStarvation', {});
         }
 
         return data;
@@ -531,13 +531,14 @@ function CmcdModel() {
         try {
             if (_firstLoad && data.state && data.state === MediaPlayerEvents.BUFFER_LOADED) {
                 _firstLoad = false;
-                console.log("TODO-LOG-RUM: Loaded! Time: " + (Date.now() - _startTime) + "ms");
+                datadogRum.addAction('videoStartTime', {
+                    'time': Date.now() - _startTime,
+                });
             }
             if (data.state && data.mediaType) {
                 if (data.state === MediaPlayerEvents.BUFFER_EMPTY) {
 
                     if (!_bufferLevelStarved[data.mediaType]) {
-                        console.log("TODO-LOG-RUM: Buffer Starved!");
                         _bufferLevelStarved[data.mediaType] = true;
                     }
                     if (!_isStartup[data.mediaType]) {
@@ -551,7 +552,7 @@ function CmcdModel() {
     }
 
     function _onPlaybackSeeked() {
-        console.log("TODO-LOG-RUM: Player seek");
+        datadogRum.addAction('playbackSeek', {});
         for (let key in _bufferLevelStarved) {
             if (_bufferLevelStarved.hasOwnProperty(key)) {
                 _bufferLevelStarved[key] = true;
