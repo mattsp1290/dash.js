@@ -106,7 +106,8 @@ function CmcdModel() {
         });
         eventBus.on(MediaPlayerEvents.PLAYBACK_ERROR, (e) => {
             datadogRum.addAction('playbackError', {
-                'error': e.error,
+                'errorCode': e.error ? e.error.code : 0,
+                'errorMessage': e.error ? e.error.message : '',
             });
         });
     }
