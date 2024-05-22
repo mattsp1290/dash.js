@@ -66,6 +66,9 @@ function CmcdModel() {
         _bufferLevelStarved,
         _initialMediaRequestsDone;
 
+    let _startTime = Date.now();
+    let _firstLoad = true;
+
     let context = this.context;
     let eventBus = EventBus(context).getInstance();
     let settings = Settings(context).getInstance();
@@ -83,6 +86,20 @@ function CmcdModel() {
         eventBus.on(MediaPlayerEvents.BUFFER_LEVEL_STATE_CHANGED, _onBufferLevelStateChanged, instance);
         eventBus.on(MediaPlayerEvents.PLAYBACK_SEEKED, _onPlaybackSeeked, instance);
         eventBus.on(MediaPlayerEvents.PERIOD_SWITCH_COMPLETED, _onPeriodSwitchComplete, instance);
+
+        // Extra events just for RUM
+        eventBus.on(MediaPlayerEvents.PLAYBACK_STARTED, () => {
+            console.log("TODO-LOG-RUM: Playback started!");
+        });
+        eventBus.on(MediaPlayerEvents.PLAYBACK_PAUSED, () => {
+            console.log("TODO-LOG-RUM: Playback paused!");
+        });
+        eventBus.on(MediaPlayerEvents.PLAYBACK_ENDED, () => {
+            console.log("TODO-LOG-RUM: Playback ended!");
+        });
+        eventBus.on(MediaPlayerEvents.PLAYBACK_ERROR, (e) => {
+            console.log("TODO-LOG-RUM: Playback error: " + e.error);
+        });
     }
 
     function setConfig(config) {
@@ -439,6 +456,22 @@ function CmcdModel() {
             _initialMediaRequestsDone[mediaType] = true;
         }
 
+        // This function is currently only called when the HTTP loader needs to
+        // send another request to the CDN for a segment. We can beacon RUM events
+        // from here knowing that it is tied to this event.
+        if (data.mtp) {
+            console.log("TODO-LOG-RUM: Throughput: " + data.mtp + "kbps");
+        }
+        if (data.br) {
+            console.log("TODO-LOG-RUM: Bitrate: " + data.br + "kbps");
+        }
+        if (data.bl) {
+            console.log("TODO-LOG-RUM: Buffer Level: " + data.bl);
+        }
+        if(data.bs) {
+            console.log("TODO-LOG-RUM: Buffer Starved: " + data.bs);
+        }
+
         return data;
     }
 
@@ -594,10 +627,15 @@ function CmcdModel() {
 
     function _onBufferLevelStateChanged(data) {
         try {
+            if (_firstLoad && data.state && data.state === MediaPlayerEvents.BUFFER_LOADED) {
+                _firstLoad = false;
+                console.log("TODO-LOG-RUM: Loaded! Time: " + (Date.now() - _startTime) + "ms");
+            }
             if (data.state && data.mediaType) {
                 if (data.state === MediaPlayerEvents.BUFFER_EMPTY) {
 
                     if (!_bufferLevelStarved[data.mediaType]) {
+                        console.log("TODO-LOG-RUM: Buffer Starved!");
                         _bufferLevelStarved[data.mediaType] = true;
                     }
                     if (!_isStartup[data.mediaType]) {
@@ -611,6 +649,7 @@ function CmcdModel() {
     }
 
     function _onPlaybackSeeked() {
+        console.log("TODO-LOG-RUM: Player seek");
         for (let key in _bufferLevelStarved) {
             if (_bufferLevelStarved.hasOwnProperty(key)) {
                 _bufferLevelStarved[key] = true;
