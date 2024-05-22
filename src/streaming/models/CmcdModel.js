@@ -367,7 +367,6 @@ function CmcdModel() {
         // This function is currently only called when the HTTP loader needs to
         // send another request to the CDN for a segment. We can beacon RUM events
         // from here knowing that it is tied to this event.
-        console.log('adding dd stuff');
         datadogRum.addAction('qualitySnapshot', {
             'throughput': data.mtp,
             'bitrate': data.br,
